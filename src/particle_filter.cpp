@@ -16,7 +16,21 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
 	// Add random Gaussian noise to each particle.
-	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
+
+	num_particles = 100;
+
+	std::default_random_engine generator;
+	std::normal_distribution<double> distribution(0.0, 1.0);
+
+	for (int i = 0; i < num_particles; i++) {
+		Particle p;
+		p.id = i;
+		p.x = x + distribution(generator)*std[0];
+		p.y = y + distribution(generator)*std[1];
+		p.theta = theta + distribution(generator)*std[2];
+		p.weight = 1;
+		particles.push_back(p);
+	}
 
 }
 
@@ -26,6 +40,22 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+	std::default_random_engine generator;
+	std::normal_distribution<double> distribution(0.0, 1.0);
+
+	for (Particle p : particles) {
+		if (yaw_rate < 0.001) {
+			p.x += velocity*cos(p.theta)*delta_t;
+			p.y += velocity*sin(p.theta)*delta_t;
+		}
+		else {
+			p.x += velocity/yaw_rate*(sin(p.theta+yaw_rate*delta_t)-sin(p.theta));
+			p.y += velocity/yaw_rate*(cos(p.theta)-cos(p.theta+yaw_rate*delta_t));
+		}
+		p.x += distribution(generator) * std_pos[0];
+		p.y += distribution(generator) * std_pos[1];
+		p.theta += yaw_rate * delta_t + distribution(generator) * std_pos[2];
+	}
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
