@@ -13,9 +13,6 @@
 #include "particle_filter.h"
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
-	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
-	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
-	// Add random Gaussian noise to each particle.
 
 	num_particles = 100;
 
@@ -35,10 +32,6 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
-	// TODO: Add measurements to each particle and add random Gaussian noise.
-	// NOTE: When adding noise you may find std::normal_distribution and std::default_random_engine useful.
-	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
-	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
 	std::default_random_engine generator;
 	std::normal_distribution<double> distribution(0.0, 1.0);
@@ -52,9 +45,9 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 			p.x += velocity/yaw_rate*(sin(p.theta+yaw_rate*delta_t)-sin(p.theta));
 			p.y += velocity/yaw_rate*(cos(p.theta)-cos(p.theta+yaw_rate*delta_t));
 		}
-		p.x += distribution(generator) * std_pos[0];
-		p.y += distribution(generator) * std_pos[1];
-		p.theta += yaw_rate * delta_t + distribution(generator) * std_pos[2];
+		p.x += distribution(generator)*std_pos[0];
+		p.y += distribution(generator)*std_pos[1];
+		p.theta += yaw_rate*delta_t + distribution(generator)*std_pos[2];
 	}
 }
 
@@ -64,6 +57,18 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
+	std::cout << predicted[0].x << std::endl;
+	for (LandmarkObs pred : predicted) {
+		std::vector<double> distances;
+		for (LandmarkObs obs : observations) {
+			distances.push_back(dist(obs.x, obs.y, pred.x, pred.y));
+		}
+		// index of minimum distance between predicted and observed landmark
+		long min_index = std::distance(distances.begin(), std::min_element(distances.begin(), distances.end()));
+		// assign observed positions to predicted
+		pred = observations[min_index];
+	}
+	std::cout << predicted[0].x << std::endl;
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -79,6 +84,27 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33. Note that you'll need to switch the minus sign in that equation to a plus to account 
 	//   for the fact that the map's y-axis actually points downwards.)
 	//   http://planning.cs.uiuc.edu/node99.html
+
+	// particles in map coordinates
+	// observations in vehicle coordinates
+
+	for (int i = 0; i < particles.size(); i++) {
+		Particle p = particles[i];
+
+		// convert observation to map coordinate (given particle p)
+		std::vector<LandmarkObs> observations_map;
+		for (LandmarkObs obs_veh : observations) {
+			LandmarkObs obs_map;
+			obs_map.x = obs_veh.x * cos(-p.theta) + obs_veh.y * sin(-p.theta);
+			obs_map.y = obs_veh.x * -sin(-p.theta) + obs_veh.y * cos(-p.theta);
+			obs_map.id = obs_veh.id;
+			observations_map.push_back(obs_map);
+		}
+
+	}
+
+
+
 }
 
 void ParticleFilter::resample() {
