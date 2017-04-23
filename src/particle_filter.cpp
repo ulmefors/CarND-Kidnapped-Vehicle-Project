@@ -24,7 +24,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	for (int i = 0; i < num_particles; i++) {
 		Particle p;
-		p.id = i;
+		p.id = -1;
 		p.x = x + distribution(generator)*std[0];
 		p.y = y + distribution(generator)*std[1];
 		p.theta = theta + distribution(generator)*std[2];
@@ -71,18 +71,24 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
-	std::cout << predicted[0].x << std::endl;
-	for (LandmarkObs pred : predicted) {
+	for (int i = 0; i < observations.size(); i++) {
+
+		// measurement observation
+		LandmarkObs observation = observations[i];
+
+		// distances between predicted observation and measurement observation
 		std::vector<double> distances;
-		for (LandmarkObs obs : observations) {
-			distances.push_back(dist(obs.x, obs.y, pred.x, pred.y));
+		for (LandmarkObs prediction : predicted) {
+			distances.push_back(dist(observation.x, observation.y, prediction.x, prediction.y));
 		}
+
 		// index of minimum distance between predicted and observed landmark
 		long min_index = std::distance(distances.begin(), std::min_element(distances.begin(), distances.end()));
-		// assign observed positions to predicted
-		pred = observations[min_index];
+
+		// assign landmark id to observation measurement
+		observation.id = predicted[min_index].id;
+		observations[i] = observation;
 	}
-	std::cout << predicted[0].x << std::endl;
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -102,6 +108,16 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	// particles in map coordinates
 	// observations in vehicle coordinates
 
+	// convert landmark_list to format comparable to observations
+	std::vector<LandmarkObs> landmarks_in_map;
+	for (Map::single_landmark_s landmark_in_map : map_landmarks.landmark_list) {
+		LandmarkObs lmo;
+		lmo.x = landmark_in_map.x_f;
+		lmo.y = landmark_in_map.y_f;
+		lmo.id = landmark_in_map.id_i;
+		landmarks_in_map.push_back(lmo);
+	}
+
 	for (int i = 0; i < particles.size(); i++) {
 		Particle p = particles[i];
 
@@ -115,9 +131,47 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			observations_map.push_back(obs_map);
 		}
 
+		// each observation has the id landmark id assigned
+		dataAssociation(landmarks_in_map, observations_map);
+
+		double w = 1.0;
+		double multiplier = 1.0;
+		for (LandmarkObs observation : observations_map) {
+			int id = observation.id;
+			int index = id - 1;
+			double dx = std::min(fabs(observation.x - landmarks_in_map[index].x), sensor_range);
+			double dy = std::min(fabs(observation.y - landmarks_in_map[index].y), sensor_range);
+			double std_x = std_landmark[0];
+			double std_y = std_landmark[1];
+
+			multiplier = 1.0/(2.0*M_PI*std_x*std_y)*exp( -0.5*(dx*dx/(std_x*std_x) + dy*dy/(std_y*std_y)) );
+			if (multiplier == 0.0) {
+				//std::cout << "id: " << id << " dx: " << dx << " dy: " << dy << std::endl;
+			}
+			w *= multiplier;
+		}
+		weights[i] = w;
 	}
 
+	for (double w : weights) {
+		//std::cout << w << std::endl;
+	}
 
+	// normalize weights if
+	double bias = 0.0;
+	double weight_sum = std::accumulate(weights.begin(), weights.end(), bias);
+
+	if (weight_sum != 0) {
+		std::transform(weights.begin(), weights.end(), weights.begin(),
+									 std::bind1st(std::multiplies<double>(), 1 / weight_sum));
+	}
+
+	// update particle weights
+	for (int i = 0; i < particles.size(); i++) {
+		Particle p = particles[i];
+		p.weight = weights[i];
+		particles[i] = p;
+	}
 
 }
 
