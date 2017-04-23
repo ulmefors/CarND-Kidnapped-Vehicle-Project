@@ -42,18 +42,26 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	std::default_random_engine generator;
 	std::normal_distribution<double> distribution(0.0, 1.0);
 
-	for (Particle p : particles) {
+	for (int i = 0; i < particles.size(); i++) {
+		// particle previous step (t-1)
+		Particle old_p = particles[i];
+		// predicted particle (t)
+		Particle new_p;
+
 		if (yaw_rate < 0.001) {
-			p.x += velocity*cos(p.theta)*delta_t;
-			p.y += velocity*sin(p.theta)*delta_t;
+			new_p.x = old_p.x + velocity*cos(old_p.theta)*delta_t;
+			new_p.y = old_p.y + velocity*sin(old_p.theta)*delta_t;
 		}
 		else {
-			p.x += velocity/yaw_rate*(sin(p.theta+yaw_rate*delta_t)-sin(p.theta));
-			p.y += velocity/yaw_rate*(cos(p.theta)-cos(p.theta+yaw_rate*delta_t));
+			new_p.x = old_p.x + velocity/yaw_rate*(sin(old_p.theta+yaw_rate*delta_t)-sin(old_p.theta));
+			new_p.y = old_p.y + velocity/yaw_rate*(cos(old_p.theta)-cos(old_p.theta+yaw_rate*delta_t));
 		}
-		p.x += distribution(generator)*std_pos[0];
-		p.y += distribution(generator)*std_pos[1];
-		p.theta += yaw_rate*delta_t + distribution(generator)*std_pos[2];
+		new_p.x += distribution(generator)*std_pos[0];
+		new_p.y += distribution(generator)*std_pos[1];
+		new_p.theta = old_p.theta + yaw_rate*delta_t + distribution(generator)*std_pos[2];
+
+		// assign predicted particle to filter particles
+		particles[i] = new_p;
 	}
 }
 
