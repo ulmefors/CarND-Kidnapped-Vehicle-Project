@@ -14,7 +14,10 @@
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
+	std::cout << "Initialize particle filter" << std::endl;
+
 	num_particles = 100;
+	double initial_weight = 1.0;
 
 	std::default_random_engine generator;
 	std::normal_distribution<double> distribution(0.0, 1.0);
@@ -25,10 +28,13 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 		p.x = x + distribution(generator)*std[0];
 		p.y = y + distribution(generator)*std[1];
 		p.theta = theta + distribution(generator)*std[2];
-		p.weight = 1;
+		p.weight = initial_weight;
 		particles.push_back(p);
+
+		weights.push_back(initial_weight);
 	}
 
+	is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
